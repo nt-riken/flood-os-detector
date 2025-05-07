@@ -27,3 +27,6 @@ flood-os-detector.code-workspace
 # OS
 .DS_Store
 Thumbs.db
+
+# reference files
+docs/*.fp
