@@ -1,0 +1,17 @@
+[project]
+name = "flood-os-detector"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "chardet>=5.2.0",
+    "dpkt>=1.9.8",
+    "psutil>=7.0.0",
+    "pyshark>=0.6",
+    "python-libpcap>=0.5.2",
+    "lmdb>=1.6.2",
+    "scapy>=2.6.1",
+    "msgspec>=0.19.0",
+    "libpcapy>=0.2.0",
+]

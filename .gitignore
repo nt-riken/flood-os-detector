@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Project specific
+mac_data.mdb/
+*.log
+results/
+*.csv
+*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.cursorrules
+.cursorignore
+flood-os-detector.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
