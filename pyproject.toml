@@ -14,4 +14,9 @@ dependencies = [
     "scapy>=2.6.1",
     "msgspec>=0.19.0",
     "libpcapy>=0.2.0",
+    "argparse>=1.4.0",
+    "cbor2>=5.6.5",
+    "lz4>=4.4.4",
+    "ijson>=3.4.0",
+    "pyp0f>=0.3.0",
 ]

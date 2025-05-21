@@ -145,10 +145,9 @@ mac_address,first_seen,last_seen,vlan_id,detected_os,device_type,vendor
 - `first_seen`: First detection timestamp
 - `last_seen`: Last detection timestamp
 - `vlan_id`: VLAN identifier
-- `detected_os`: Final OS detection result
-- `device_type`: OUI-based device purpose
+- `oui_purpose`: OUI-based device purpose
 - `vendor`: Vendor information from OUI
-
+- `detect_os`: list of each method's OS detection result
 ## Logging Standards
 
 ### Log File Requirements

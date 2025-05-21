@@ -22,20 +22,22 @@
 ## 3. Product Overview
 - **Core Features**:
   - Network packet capture
-  - OS fingerprinting
-  - Traffic analysis
-  - Data export capabilities
+  - Modular OS fingerprinting pipeline
+  - Flexible analysis capabilities
+  - JSON-based data export
 - **Target Users**: organization IT administrator
 - **Key Differentiators**:
   - The data source is VLAN trunk packet capturing. unicast flood/multicast/broadcast packet are target
-  - Mix of methods to detect OS. p0f TCP Syn analyze and DHCP/mDNS/SSDP analysis.
+  - Modular analysis pipeline with specialized detection methods
+  - Shell integration for flexible analysis
   - Very scalable. Avoiding main stream capture, it need only usual server resource for large number of PC/Macs. e.g., 10GB DB to 30000 PC/Macs.
   - Near realtime detection
   - Continuous monitor
 - **Technical Architecture**:
-  - Consists of two parts:
+  - Consists of three parts:
     - Monitoring daemon: Captures and stores fingerprints in LMDB
-    - Analyze tool: Reads LMDB and outputs detection results
+    - Data export: Streams JSON data from LMDB
+    - Analysis pipeline: Modular analysis tools with shell integration
   - Uses LMDB as an in-memory database for performance and persistence
 
 ## 4. User Stories
@@ -52,9 +54,10 @@
   - Linux with packet capture access right
   - Tested on AlmaLinux
 - **User Interface**:
-  - Linux CLI
+  - Linux CLI with shell integration
 - **Output**:
-  - CSV
+  - JSON stream format
+  - Shell-friendly for analysis
 
 ## 6. Technical Requirements
 - **Development Environment**:
@@ -66,41 +69,94 @@
   - LMDB as memory DB
   - p0f (using fp file in p0f)
   - nmap (using OUI file in nmap)
+  - jq for JSON processing
+  - Shell tools for analysis
 - **Performance Requirements**:
   - Random MAC expiration: 24 hours of no detection
   - LMDB memory size: Currently using 10GB for ~30,000 devices
   - Expected device purpose based on OUI analysis
+  - Streaming processing for memory efficiency
 - **Security Requirements**:
   - Requires sudo for packet capture
   - Network security considerations are the responsibility of the deploying organization
 - **Scalability Considerations**:
   - CPU and usable memory
   - No VLAN range restrictions
+  - Parallel processing support
 
 ## 7. Non-Functional Requirements
-- **Performance Metrics**: [To be filled]
-- **Reliability Requirements**: [To be filled]
-- **Security Requirements**: [To be filled]
-- **Compliance Requirements**: [To be filled]
+- **Performance Metrics**: 
+  - JSON processing speed
+  - Analysis pipeline throughput
+  - Memory usage per analysis module
+- **Reliability Requirements**: 
+  - Error handling in each analysis module
+  - Data preservation on analysis failure
+- **Security Requirements**: 
+  - Secure handling of network data
+  - Proper error logging
+- **Compliance Requirements**: 
+  - Network monitoring compliance
+  - Data retention policies
 
 ## 8. Development Guidelines
-- **Coding Standards**: [To be filled]
+- **Coding Standards**: 
+  - Modular design
+  - Stream processing
+  - Error handling
+  - Documentation
 - **Version Control**: Git
-- **Testing Requirements**: [To be filled]
-- **Documentation Requirements**: [To be filled]
+- **Testing Requirements**: 
+  - Unit tests for each module
+  - Pipeline integration tests
+  - Performance tests
+- **Documentation Requirements**: 
+  - Module specifications
+  - Pipeline usage
+  - Shell integration guide
 
 ## 9. Timeline and Milestones
-- **Development Phases**: [To be filled]
-- **Key Deliverables**: [To be filled]
-- **Dependencies**: [To be filled]
-- **Risk Assessment**: [To be filled]
+- **Development Phases**: 
+  1. Core capture and storage
+  2. Basic analysis modules
+  3. Shell integration
+  4. Advanced analysis
+- **Key Deliverables**: 
+  - Capture daemon
+  - Analysis modules
+  - Documentation
+- **Dependencies**: 
+  - p0f signatures
+  - OUI database
+  - Fingerbank database
+- **Risk Assessment**: 
+  - Analysis accuracy
+  - Performance impact
+  - Resource usage
 
 ## 10. Success Criteria
-- **Key Performance Indicators**: [To be filled]
-- **Metrics for Success**: [To be filled]
-- **Validation Methods**: [To be filled]
+- **Key Performance Indicators**: 
+  - Detection accuracy
+  - Processing speed
+  - Resource usage
+- **Metrics for Success**: 
+  - 70% detection rate
+  - Real-time processing
+  - Low resource usage
+- **Validation Methods**: 
+  - Known device testing
+  - Performance benchmarking
+  - Accuracy measurement
 
 ## 11. Future Considerations
-- **Potential Future Features**: [To be filled]
-- **Scalability Plans**: [To be filled]
-- **Maintenance Requirements**: [To be filled] 
+- **Potential Future Features**: 
+  - Additional analysis modules
+  - Web interface
+  - API integration
+- **Scalability Plans**: 
+  - Distributed processing
+  - Cloud integration
+- **Maintenance Requirements**: 
+  - Regular signature updates
+  - Performance monitoring
+  - Error tracking 

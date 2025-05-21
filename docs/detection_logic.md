@@ -1,114 +1,168 @@
+# OS Detection Logic
 
-# OS derection logic detail
+## Overview
+This document describes the detection methods used in the modular analysis pipeline. Each method is implemented as a separate analysis module that processes JSON data and adds its results to the output.
 
-Before all, we should give up comprehensive OS detection result. Migrate to each's method's result only. Give final decision chance to users.
+## Detection Methods
 
-## DHCP OS detection
+### 1. TCP Signature Analysis (`tcp_sig_analysis.py`)
 
-fingerprniting:
-- DHCP paramter request list (option 55)
-- DHCP vendor class identifier (option 60)
-- DHCP host name (option 12) OR DHCP user class (option 77)
+#### Purpose
+Detect operating systems using TCP SYN packet fingerprinting.
 
-analyze algorithm:
-fingerback table matching
-
-@https://github.com/karottc/fingerbank/blob/master/dhcp_fingerprints.conf
-
-## mDNS OS detection
-
-Here is fingerprint - OS corresponding table.
-
-| Observation                                                                 | Fingerprint                          | Deduced OS (and version)                             |
-|------------------------------------------------------------------------------|--------------------------------------|-------------------------------------------------------|
-| **DNS-SD service** `<device-info>._tcp.local`<br/>TXT keys include `osxvers` | `model`, `osxvers`                   | **macOS**<br/>Version = `osxvers − 4` (e.g. 20 → 16 → 11.0)  |
-| **same** `<device-info>._tcp.local`<br/>TXT keys include `deviceid`,`osv`     | `model`=`iPhone*`/`iPad*`, `osv`     | **iOS / iPadOS**<br/>Version = `osv`                   |
-| **same** `<device-info>._tcp.local`<br/>TXT keys include `firmwarever`       | `model`=`AppleTV*` or HomeKit types  | **tvOS / HomeKit**<br/>Firmware = `firmwarever`        |
-| **DNS-SD service** `<workstation>._tcp.local`<br/>TXT: only `org.freedesktop.Avahi.cookie` | none of the Apple keys above         | **Linux** (Avahi)                                      |
-| **only** service `_smb._tcp.local` (and no `<device-info>`)                  | no DNS-SD TXT records other than SMB | **Windows** (possibly Bonjour installed)               |
-| **mix of** `_ipp._tcp.local`, TXT keys `txtvers`, `URF=`, `TBCP=`             | IPP printer stack                    | **Printer appliance / embedded OS**                    |
-| **any** service with entirely missing TXT record or malformed TXT            | non-standard mDNS stack (lwIP, etc.) | **IoT / embedded**—fingerprint by violation pattern   |
-
-### fingerprint must capture
-- <device-info>._tcp.local
-- _smb._tcp.local (and no <device-info>)
-- _ipp._tcp.local
-
-### sample logic for analyze
-
-```python
-# assume get_services() → list of service-types advertised
-#       get_txt(svc)      → dict of TXT key→value for that service
-
-services = get_services()
-txt = { svc: get_txt(svc) for svc in services }
-
-if "_device-info._tcp.local" in services:
-    info = txt["_device-info._tcp.local"]
-    if "osxvers" in info:
-        ver = int(info["osxvers"]) - 4
-        os = f"macOS {ver}"
-    elif "deviceid" in info and "osv" in info:
-        os = f"iOS {info['osv']}"
-    elif "firmwarever" in info:
-        os = f"tvOS/HomeKit (fw {info['firmwarever']})"
-    else:
-        os = f"Apple device (model {info.get('model','?')})"
-
-elif "_workstation._tcp.local" in services \
-     and "org.freedesktop.Avahi.cookie" in txt["_workstation._tcp.local"]:
-    os = "Linux (Avahi)"
-
-elif "_smb._tcp.local" in services \
-     and "_device-info._tcp.local" not in services:
-    os = "Windows"
-
-elif any(svc.startswith("_ipp._tcp.local") for svc in services):
-    os = "Printer/embedded (IPP stack)"
-
-else:
-    os = "Unknown/IoT (non-standard mDNS stack)"
-
-```
-
-## SSDP OS detection
-
-SSDP suggestion from specialist
-
-| Header                    | Windows                                                   | macOS / iOS                             | Linux (mini-upnpd, GUPnPd…)            |
-   |---------------------------|-----------------------------------------------------------|-----------------------------------------|----------------------------------------|
-   | `SERVER`                  | `Windows/10.0 UPnP/1.0 Windows-ConnectNow/1.0`            | `Darwin/18.2.0 UPnP/1.1`                | `Linux/4.15.0-54-generic UPnP/1.0 …`   |
-   | `BOOTID.UPNP.ORG`         | present (Vista+)                                          | present                                 | often absent or vendor-spe ([API documentation - Fingerbank](https://api.fingerbank.org/api_doc/2/combinations/interrogate.html?utm_source=chatgpt.com)) `MX`                      | `MX: 2`                                                   | usually `MX: 3`                         | `MX: 3` or higher, varies by SDK       |
-   | `Cache-Control: max-age`  | `max-age=1800`                                            | `max-age=1800`                          | often shorter (e.g. `max-age=120`)     |
-   | Header order & casing     | ALL-CAPS, ordered as in Microsoft’s reference code        | mix ([セキュリティチェックに「Censys」を使ったら便利だった件について](https://qiita.com/fujihide/items/b1a9fe342a482dacc655?utm_source=chatgpt.com))ple’s implementation | lowercase or mixed, code-order driven  |
-   | `LOCATION` path & port    | `/rootDesc.xml` on 1900/5000                              | `/DeviceDescription.xml` on 49152       | `/desc.xml` on ephemeral port          |
-
-### fingerprint must capture
-header in the table
-
-### analyze
-heuristic ruls in the table
-
-## TCP Syn detection
-
-According to p0f signature method
-
+#### Signature Format
 `olen:ttl:tos:mss:win:opts:quirks:pclass`
 
-### fingerprnit must capture
-- TCP options list keeps order
-- MSS
+#### Required Fields
+- TCP options list (maintains order)
+- MSS value
 - Window size
 - TTL
 - TOS
 
-### Analysis method
-matching TCP signature part of fp file in p0f
+#### Analysis Method
+1. Extract TCP signature components
+2. Match against p0f signature database
+3. Calculate confidence score
+4. Add results to JSON
 
-## OUI and vendor purpose analysis
+#### Output Format
+```json
+{
+  "tcp_signature": {
+    "os_type": "string",
+    "confidence": float,
+    "details": {
+      "matched_signature": "string",
+      "ttl": integer,
+      "window_size": integer,
+      "mss": integer,
+      "options": ["string"]
+    }
+  }
+}
+```
 
-Currently, OUI-producy category mapping method is researched.
-In this project, implement followings as preparation:
+### 2. OUI Analysis (`oui_analysis.py`)
 
-- When vendor analysis is needed, look up nmap information file and got vendor name
-- If vendor name is got, look up manual created vendor - category map and report it as OUI analysis result
+#### Purpose
+Identify device vendors and categorize devices based on MAC address OUI.
+
+#### Analysis Method
+1. Extract OUI from MAC address
+2. Look up vendor in OUI database (from nmap)
+3. Map vendor to device category
+4. Add results to JSON
+
+#### Output Format
+```json
+{
+  "vendor_info": {
+    "vendor": "string",
+    "category": "string",
+    "confidence": float,
+    "details": {
+      "oui": "string",
+      "category_source": "string"
+    }
+  }
+}
+```
+
+### 3. Fingerbank Analysis (`fingerbank_analysis.py`)
+
+#### Purpose
+Detect operating systems and device types using DHCP fingerprinting.
+
+#### Required Fields
+- DHCP parameter request list (option 55)
+- DHCP vendor class identifier (option 60)
+- DHCP host name (option 12)
+- DHCP user class (option 77)
+
+#### Analysis Method
+1. Extract DHCP options
+2. Match against Fingerbank database
+3. Calculate confidence score
+4. Add results to JSON
+
+#### Output Format
+```json
+{
+  "fingerbank_detection": {
+    "os_type": "string",
+    "version": "string",
+    "confidence": float,
+    "details": {
+      "matched_fingerprint": "string",
+      "dhcp_options": {
+        "55": ["string"],
+        "60": "string",
+        "12": "string",
+        "77": "string"
+      }
+    }
+  }
+}
+```
+
+### 4. mDNS Analysis
+
+#### Purpose
+Detect operating systems using mDNS service advertisements.
+
+#### Required Services
+- `<device-info>._tcp.local`
+- `_smb._tcp.local`
+- `_ipp._tcp.local`
+
+#### Detection Rules
+
+| Observation | Fingerprint | Deduced OS |
+|-------------|-------------|------------|
+| `<device-info>._tcp.local` with `osxvers` | `model`, `osxvers` | **macOS** (Version = `osxvers − 4`) |
+| `<device-info>._tcp.local` with `deviceid`,`osv` | `model`=`iPhone*`/`iPad*`, `osv` | **iOS / iPadOS** |
+| `<device-info>._tcp.local` with `firmwarever` | `model`=`AppleTV*` or HomeKit types | **tvOS / HomeKit** |
+| `<workstation>._tcp.local` with `org.freedesktop.Avahi.cookie` | none of the Apple keys | **Linux** (Avahi) |
+| `_smb._tcp.local` without `<device-info>` | no DNS-SD TXT records other than SMB | **Windows** |
+| `_ipp._tcp.local` with `txtvers`, `URF=`, `TBCP=` | IPP printer stack | **Printer appliance** |
+| Missing or malformed TXT records | non-standard mDNS stack | **IoT / embedded** |
+
+### 5. SSDP Analysis
+
+#### Purpose
+Detect operating systems using SSDP headers.
+
+#### Detection Rules
+
+| Header | Windows | macOS / iOS | Linux |
+|--------|---------|------------|-------|
+| `SERVER` | `Windows/10.0 UPnP/1.0 Windows-ConnectNow/1.0` | `Darwin/18.2.0 UPnP/1.1` | `Linux/4.15.0-54-generic UPnP/1.0` |
+| `BOOTID.UPNP.ORG` | present (Vista+) | present | often absent |
+| `MX` | `MX: 2` | usually `MX: 3` | `MX: 3` or higher |
+| `Cache-Control: max-age` | `max-age=1800` | `max-age=1800` | often shorter |
+| Header order & casing | ALL-CAPS, ordered | mixed | lowercase or mixed |
+| `LOCATION` path & port | `/rootDesc.xml` on 1900/5000 | `/DeviceDescription.xml` on 49152 | `/desc.xml` on ephemeral port |
+
+## Pipeline Integration
+
+Each detection method is implemented as a separate analysis module that:
+1. Reads JSON from stdin
+2. Processes each line as a JSON object
+3. Adds analysis results to the object
+4. Outputs modified JSON to stdout
+5. Logs errors to stderr
+
+## Error Handling
+
+- Invalid JSON: Skip and log error
+- Missing fields: Skip analysis, preserve original data
+- Database errors: Log error, continue processing
+- Analysis errors: Log error, include error in output
+
+## Performance Considerations
+
+- Streaming processing for memory efficiency
+- Caching for database lookups
+- Parallel processing support
+- Batch processing options
